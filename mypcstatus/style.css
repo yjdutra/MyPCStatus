@@ -1,0 +1,41 @@
+#root { background: transparent; }
+
+#title     { color: #6B7389; font-size: 10px; font-weight: bold; }
+#speech    { color: #98A3B8; font-size: 10px; font-style: italic; }
+#phase     { color: #6B7389; font-size: 10px; font-weight: bold; }
+#clock     { color: #E6EBF5; font-size: 27px; font-weight: bold;
+             font-family: monospace; }
+#cycles    { color: #5E64E8; font-size: 10px; font-weight: bold; }
+
+button.flat {
+    background-image: none;
+    background-color: #1A1F2B;
+    border: 1px solid #262C3C;
+    color: #98A3B8;
+    border-radius: 7px;
+    padding: 3px 10px;
+    min-height: 0;
+    min-width: 0;
+    box-shadow: none;
+    text-shadow: none;
+}
+button.flat:hover  { background-color: #262C3C; color: #E6EBF5; }
+button.flat:active,
+button.flat:checked { background-color: #5E64E8; color: #FFFFFF;
+                      border-color: #5E64E8; }
+button.flat:disabled { color: #3C4253; }
+
+button.chip { padding: 2px 7px; font-size: 11px; }
+button.go   { background-color: #22283A; color: #E6EBF5; }
+
+separator {
+    background-color: #242A38;
+    background-image: none;
+    min-height: 1px;
+    border: none;
+}
+
+tooltip, tooltip.background {
+    background-color: #151923;
+    color: #98A3B8;
+}

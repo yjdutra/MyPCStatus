@@ -1,0 +1,12 @@
+[Desktop Entry]
+# Exec e Icon sao reescritos pelo install.sh com o caminho real da pasta.
+Type=Application
+Name=MyPCStatus
+GenericName=Monitor do sistema
+Comment=Métricas de CPU, RAM, temperatura e rede com pomodoro e mascote
+Exec=run.sh
+Icon=assets/icon.png
+Terminal=false
+Categories=Utility;System;Monitor;
+Keywords=cpu;ram;temperatura;pomodoro;monitor;
+StartupNotify=false

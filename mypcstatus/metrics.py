@@ -13,6 +13,8 @@ import time
 
 import psutil
 
+from .gpu import GpuMonitor
+
 # ordem de preferencia para "a" temperatura do sistema
 _TEMP_PREF = [
     ("coretemp", "Package id 0"),
@@ -59,18 +61,25 @@ class Metrics:
         self._last_t = time.monotonic()
         self._ping_stop = threading.Event()
         self._ping_thread = None
+        self.gpus = GpuMonitor()
 
         psutil.cpu_percent(interval=None, percpu=True)   # descarta a 1a leitura
 
+    # ------------------------------------------------------------- ciclo
+    def start(self):
+        self._start_ping()
+        self.gpus.start()
+
+    def stop(self):
+        self._ping_stop.set()
+        self.gpus.stop()
+
     # ------------------------------------------------------------- ping
-    def start_ping(self):
+    def _start_ping(self):
         if self._ping_thread:
             return
         self._ping_thread = threading.Thread(target=self._ping_loop, daemon=True)
         self._ping_thread.start()
-
-    def stop_ping(self):
-        self._ping_stop.set()
 
     def _ping_loop(self):
         ping = shutil.which("ping")
@@ -141,6 +150,7 @@ class Metrics:
             self.battery_left = (bat.secsleft if bat.secsleft and bat.secsleft > 0
                                  else None)
 
+        self.gpus.sample()
         self.uptime = time.time() - psutil.boot_time()
 
         self.cpu_hist.append(self.cpu)

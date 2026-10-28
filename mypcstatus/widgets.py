@@ -34,6 +34,7 @@ GRID_H = 20
 CORE_ROW_H = 16
 CORE_LABEL_W = 32
 CORE_VALUE_W = 30
+GPU_NAME_H = 15
 
 
 def rgb(cr, name, a=1.0):
@@ -61,10 +62,10 @@ def level_color(pct, warn=60, crit=85):
 
 
 class StatsPanel(Gtk.DrawingArea):
-    """Tres barras principais (CPU/RAM/TEMP) + uma grade compacta embaixo.
+    """Barras principais (CPU/RAM/TEMP/GPU) + uma grade compacta embaixo.
 
-    A linha da CPU abre um dropdown com cada nucleo, no mesmo estilo das
-    barras principais. Clicar em qualquer lugar da linha alterna.
+    As linhas de CPU e GPU abrem um dropdown com os detalhes. Clicar em
+    qualquer ponto da linha alterna.
     """
 
     def __init__(self, cfg, on_resize=None):
@@ -74,6 +75,8 @@ class StatsPanel(Gtk.DrawingArea):
         self.speed_text = None
         self.on_resize = on_resize
         self.cpu_expanded = bool(cfg.get("cpu_expanded", False))
+        self.gpu_expanded = bool(cfg.get("gpu_expanded", False))
+        self._hit = {}            # faixa clicavel de cada linha, medida ao desenhar
         self._h = 0
         self.add_events(Gdk.EventMask.BUTTON_PRESS_MASK)
         self.connect("button-press-event", self._on_click)
@@ -85,6 +88,35 @@ class StatsPanel(Gtk.DrawingArea):
         self._sync_height()
         self.queue_draw()
 
+    # ------------------------------------------------------------- dados
+    def _gpu(self):
+        if self.m is None or not self.m.gpus.available:
+            return None
+        return self.m.gpus.primary
+
+    def _gpu_cells(self):
+        """Celulas do dropdown da GPU: (rotulo, valor, cor)."""
+        g = self._gpu()
+        if g is None:
+            return []
+        warn = self.cfg.get("gpu_temp_warn", 80)
+        crit = self.cfg.get("gpu_temp_crit", 90)
+        cells = []
+        if g.temp is not None:
+            cells.append(("temp", "%.0f°C" % g.temp,
+                          level_color(g.temp, warn, crit)))
+        if g.mem_total:
+            cells.append(("vram", "%s/%s" % (fmt_bytes(g.mem_used),
+                                             fmt_bytes(g.mem_total)),
+                          level_color(g.mem_pct)))
+        if g.clock:
+            cells.append(("clock", "%.0fMHz" % g.clock, "text"))
+        for other in self.m.gpus.secondary:
+            if other.clock:
+                lab = other.short if len(other.short) <= 11 else "iGPU"
+                cells.append((lab.lower(), "%.0fMHz" % other.clock, "text"))
+        return cells
+
     # ------------------------------------------------------------- tamanho
     def _core_rows(self):
         if not self.cpu_expanded:
@@ -92,11 +124,19 @@ class StatsPanel(Gtk.DrawingArea):
         n = len(self.m.cpu_cores) if self.m else 0
         return (n + 1) // 2
 
+    def _gpu_rows(self):
+        if not self.gpu_expanded:
+            return 0
+        n = len(self._gpu_cells())
+        return (n + 1) // 2
+
     def _wanted_height(self):
-        h = ROW_H * 3 + GRID_H * 3 + 14
-        rows = self._core_rows()
-        if rows:
-            h += rows * CORE_ROW_H + 6
+        bars = 4 if self._gpu() is not None else 3
+        h = ROW_H * bars + GRID_H * 3 + 14
+        if self._core_rows():
+            h += self._core_rows() * CORE_ROW_H + 6
+        if self._gpu_rows():
+            h += self._gpu_rows() * GRID_H + GPU_NAME_H + 4
         return h
 
     def _sync_height(self):
@@ -108,12 +148,16 @@ class StatsPanel(Gtk.DrawingArea):
                 self.on_resize()
 
     def _on_click(self, widget, event):
-        if event.button == 1 and event.y <= ROW_H + 2:
-            self.cpu_expanded = not self.cpu_expanded
-            self.cfg["cpu_expanded"] = self.cpu_expanded
-            self._sync_height()
-            self.queue_draw()
-            return True
+        if event.button != 1:
+            return False
+        for key, (y0, y1) in self._hit.items():
+            if y0 <= event.y <= y1:
+                attr = key + "_expanded"
+                setattr(self, attr, not getattr(self, attr))
+                self.cfg[attr] = getattr(self, attr)
+                self._sync_height()
+                self.queue_draw()
+                return True
         return False
 
     # ------------------------------------------------------------- desenho
@@ -184,40 +228,72 @@ class StatsPanel(Gtk.DrawingArea):
         if m is None:
             return False
 
+        self._hit = {}
         warn, crit = self.cfg["temp_warn"], self.cfg["temp_crit"]
+        col_w = (w - PAD * 2 - 10) / 2
+        cx2 = PAD + col_w + 10
         y = ROW_H / 2 + 2
 
+        # ---- CPU, com os nucleos
         self._row(cr, y, w, "CPU", m.cpu, "%.0f%%" % m.cpu, level_color(m.cpu))
         self._chevron(cr, PAD + 27, y, self.cpu_expanded)
+        self._hit["cpu"] = (y - ROW_H / 2, y + ROW_H / 2)
         y += ROW_H / 2
 
-        rows = self._core_rows()
-        if rows:
+        if self._core_rows():
             y += 2
-            cw = (w - PAD * 2 - 10) / 2
             for i, pct in enumerate(m.cpu_cores):
-                cx = PAD + (i % 2) * (cw + 10)
+                cx = PAD + (i % 2) * (col_w + 10)
                 cy = y + CORE_ROW_H / 2 + (i // 2) * CORE_ROW_H
-                self._core(cr, cx, cy, cw, i, pct)
-            y += rows * CORE_ROW_H + 4
+                self._core(cr, cx, cy, col_w, i, pct)
+            y += self._core_rows() * CORE_ROW_H + 4
 
+        # ---- RAM
         y += ROW_H / 2
         self._row(cr, y, w, "RAM", m.ram_pct,
                   "%s/%s" % (fmt_bytes(m.ram_used), fmt_bytes(m.ram_total)),
                   level_color(m.ram_pct))
         y += ROW_H
+
+        # ---- temperatura da CPU
         if m.temp is None:
             self._row(cr, y, w, "TEMP", 0, "--", "dim")
         else:
             pct = max(0.0, min((m.temp - 30) / (crit + 10 - 30) * 100, 100))
             self._row(cr, y, w, "TEMP", pct, "%.0f°C" % m.temp,
                       level_color(m.temp, warn, crit))
+        y += ROW_H / 2
+
+        # ---- GPU, com os detalhes
+        g = self._gpu()
+        if g is not None:
+            y += ROW_H / 2
+            if g.util is not None:
+                self._row(cr, y, w, "GPU", g.util, "%.0f%%" % g.util,
+                          level_color(g.util))
+            elif g.clock_pct is not None:
+                # sem uso real (caso do i915 sem root): mostra o clock, e diz
+                # que e' clock, em vez de fingir que e' porcentagem de uso
+                self._row(cr, y, w, "GPU", g.clock_pct, "%.0fMHz" % g.clock,
+                          level_color(g.clock_pct))
+            else:
+                self._row(cr, y, w, "GPU", 0, "--", "dim")
+            self._chevron(cr, PAD + 27, y, self.gpu_expanded)
+            self._hit["gpu"] = (y - ROW_H / 2, y + ROW_H / 2)
+            y += ROW_H / 2
+
+            if self._gpu_rows():
+                y += 2
+                self._text(cr, PAD, y + GPU_NAME_H / 2, g.short, "dim", 8)
+                y += GPU_NAME_H
+                for i, (lab, val, color) in enumerate(self._gpu_cells()):
+                    cx = PAD + (i % 2) * (col_w + 10)
+                    cy = y + GRID_H / 2 + (i // 2) * GRID_H
+                    self._cell(cr, cx, cy, col_w, lab, val, color)
+                y += self._gpu_rows() * GRID_H + 2
 
         # ---- grade compacta
-        y += ROW_H - 2
-        col_w = (w - PAD * 2 - 10) / 2
-        cx2 = PAD + col_w + 10
-
+        y += ROW_H / 2 - 2
         self._cell(cr, PAD, y, col_w, "baixada", fmt_rate(m.net_down), "cyan")
         self._cell(cr, cx2, y, col_w, "subida", fmt_rate(m.net_up), "cyan")
         y += GRID_H

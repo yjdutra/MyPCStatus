@@ -101,13 +101,23 @@ class Mood:
         self._i = 0
         self._next_rotate = time.monotonic() + self.ROTATE_EVERY
 
+    @staticmethod
+    def _gpu(m):
+        """A GPU principal, ou None se a maquina nao tiver nenhuma legivel."""
+        return m.gpus.primary if m.gpus.available else None
+
     def pick(self, m, pomo):
         """Devolve (pose, eyes_override, frase)."""
         warn, crit = self.cfg["temp_warn"], self.cfg["temp_crit"]
+        gwarn = self.cfg.get("gpu_temp_warn", 80)
+        gcrit = self.cfg.get("gpu_temp_crit", 90)
         temp = m.temp
+        gpu = self._gpu(m)
 
         if temp is not None and temp >= crit:
             return "hot", None, f"{temp:.0f}°C! tá fervendo aqui"
+        if gpu is not None and gpu.temp is not None and gpu.temp >= gcrit:
+            return "hot", None, f"GPU a {gpu.temp:.0f}°C, pega leve"
         if pomo.phase == FOCUS:
             return "work", ("strain" if m.cpu > 85 else None), "foco — tô junto"
         if pomo.phase == SHORT:
@@ -120,8 +130,12 @@ class Mood:
             return "alert", None, f"CPU em {m.cpu:.0f}%, segura aí"
         if m.ram_pct >= 90:
             return "alert", "surprise", f"RAM em {m.ram_pct:.0f}%"
+        if gpu is not None and gpu.util is not None and gpu.util >= 95:
+            return "alert", None, f"GPU a {gpu.util:.0f}%, trabalhando"
         if temp is not None and temp >= warn:
             return "hot", None, f"{temp:.0f}°C, tá esquentando"
+        if gpu is not None and gpu.temp is not None and gpu.temp >= gwarn:
+            return "hot", None, f"GPU em {gpu.temp:.0f}°C"
         if m.disk_pct >= 90:
             return "idle", "curious", f"disco em {m.disk_pct:.0f}%, dá uma limpada"
 

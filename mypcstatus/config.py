@@ -12,6 +12,7 @@ DEFAULTS = {
     "scale": 4,           # pixels de tela por pixel logico do mascote
     "cpu_smooth": 3,      # amostras na media movel da CPU (1 = sem suavizar)
     "cpu_expanded": False,  # dropdown dos nucleos aberto
+    "gpu_expanded": False,  # dropdown dos detalhes da GPU aberto
     "opacity": 1.0,          # 0.85-0.95 deixa o fundo transparecer
     "keep_above": True,
     "focus_min": 25,
@@ -22,6 +23,8 @@ DEFAULTS = {
     "sound": True,
     "temp_warn": 75,      # °C: mascote comeca a reclamar
     "temp_crit": 85,      # °C: mascote entra em panico
+    "gpu_temp_warn": 80,  # GPU aquece mais que CPU: limiares proprios
+    "gpu_temp_crit": 90,
 }
 
 

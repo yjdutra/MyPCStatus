@@ -42,7 +42,7 @@ class StatusWindow(Gtk.Window):
         self._build_ui()
         self._load_css()
 
-        self.m.start_ping()
+        self.m.start()
         self._tick()
         GLib.timeout_add_seconds(1, self._tick)
 
@@ -405,7 +405,7 @@ class StatusWindow(Gtk.Window):
     def quit(self):
         if self._user_moved:                  # arraste que o debounce nao pegou
             self._save_pos()
-        self.m.stop_ping()
+        self.m.stop()
         self.mascot.stop()
         config.save(self.cfg)
         if self.app is not None:

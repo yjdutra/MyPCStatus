@@ -29,6 +29,7 @@ Não instala nada: usa só o que já vem numa distro GTK 3 com Python.
 | **CPU** | média dos núcleos, suavizada em 3 amostras. Clique na linha e ela abre com cada núcleo separado |
 | **RAM** | usada / total |
 | **Temperatura** | `coretemp` → `k10temp` → `acpitz`, nessa ordem; se nenhum existir, pega o sensor mais quente que fizer sentido |
+| **GPU** | uso, temperatura, VRAM e clock. Clique na linha e ela abre com os detalhes e a GPU integrada |
 | **Rede** | taxa de download/upload lida dos contadores do kernel + ping a cada 10 s |
 | **Disco** | uso de `/` e temperatura do NVMe |
 | **Bateria** | percentual, carregando ou não |
@@ -55,11 +56,14 @@ A pose sai do estado real da máquina, em ordem de prioridade:
 | Quando | O que ele faz |
 |---|---|
 | temperatura ≥ `temp_crit` | sua frio, olhos `>_<` |
+| GPU ≥ `gpu_temp_crit` | sua frio também |
 | pomodoro em foco | senta no notebook |
 | pausa curta | toma café |
 | pausa longa | lê um livro |
 | CPU ≥ 88% ou RAM ≥ 90% | arregala os olhos |
+| GPU ≥ 95% de uso | arregala os olhos |
 | temperatura ≥ `temp_warn` | começa a suar |
+| GPU ≥ `gpu_temp_warn` | começa a suar |
 | disco ≥ 90% | olhar curioso, sugere uma limpada |
 | nada acontecendo | alterna a cada 24 s entre parado, ouvindo música, notebook, livro e café |
 | CPU < 6% e parado | dorme, com Zzz |
@@ -102,6 +106,7 @@ Opcionais, para ícone de bandeja e notificação: `gir1.2-ayatanaappindicator3-
 |---|---|
 | Mover | arraste pelo cabeçalho **ou pelo próprio gato** |
 | Abrir os núcleos | clique na linha `CPU` |
+| Abrir os detalhes da GPU | clique na linha `GPU` |
 | Menu | botão direito no gato |
 | Sempre no topo | botão 📌 |
 | Esconder na bandeja | botão `–` |
@@ -124,6 +129,7 @@ Feche o app antes de editar — ele regrava o arquivo ao sair.
 | `keep_above` | `true` | sempre no topo |
 | `cpu_smooth` | `3` | amostras na média móvel da CPU (`1` desliga) |
 | `cpu_expanded` | `false` | já abre com os núcleos à mostra |
+| `gpu_expanded` | `false` | já abre com os detalhes da GPU à mostra |
 | `focus_min` | `25` | minutos de foco |
 | `short_min` | `5` | pausa curta |
 | `long_min` | `15` | pausa longa |
@@ -132,6 +138,8 @@ Feche o app antes de editar — ele regrava o arquivo ao sair.
 | `sound` | `true` | som na virada de fase |
 | `temp_warn` | `75` | °C em que o gato começa a reclamar |
 | `temp_crit` | `85` | °C em que ele entra em pânico |
+| `gpu_temp_warn` | `80` | idem para a GPU, que trabalha mais quente |
+| `gpu_temp_crit` | `90` | idem |
 
 ## Como funciona
 
@@ -141,6 +149,7 @@ mypcstatus/
   sprite.py     compõe corpo + pose + expressão num grid de caracteres
   mascot.py     desenha e anima o sprite; decide a pose pelas métricas
   metrics.py    coleta CPU/RAM/temperatura/rede/disco/bateria
+  gpu.py        leitura de GPU, um backend por fabricante
   pomodoro.py   máquina de estados do timer
   speedtest.py  teste de banda sob demanda
   widgets.py    painel de métricas desenhado com cairo + pango
@@ -160,6 +169,14 @@ um widget flutuante sempre-no-topo precisa.
 
 **O tempo do pomodoro vem de `time.monotonic()`**, não da contagem de ticks. Se
 a interface travar ou o timer da GLib atrasar, o relógio continua certo.
+
+**Cada GPU tem o seu backend**, porque o que dá para medir muda com o driver.
+NVIDIA entrega tudo pelo `nvidia-smi`, mas custa ~16 ms por chamada porque sobe
+um processo — então ela é lida numa thread a cada 2 s, nunca na thread da
+interface. AMD publica `gpu_busy_percent` em sysfs, uso real e de graça. Já o
+i915 da Intel **não expõe uso sem root** (precisa do PMU via perf): só dá para
+ler a frequência, que é indício de carga e não uso. Nesse caso a barra mostra o
+clock e o rótulo diz `MHz`, em vez de fingir que é porcentagem.
 
 **Instância única pelo `Gtk.Application`.** O app registra um `application_id` no
 barramento de sessão; abrir de novo manda um `activate` para quem já está

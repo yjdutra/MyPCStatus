@@ -14,7 +14,7 @@ if gtkcompat.HAVE_NOTIFY:
 else:                                          # pragma: no cover
     Notify = None
 
-from . import config, speedtest
+from . import config, pubip, speedtest
 from .mascot import MascotArea, Mood
 from .metrics import Metrics
 from .pomodoro import FOCUS, LONG, PAUSED, SHORT, Pomodoro
@@ -185,7 +185,10 @@ class StatusWindow(Gtk.Window):
         root.pack_start(self.speech, False, False, 2)
 
         # --- metricas
-        self.stats = StatsPanel(self.cfg, on_resize=self._on_panel_resize)
+        self.stats = StatsPanel(self.cfg,
+                                on_resize=self._on_panel_resize,
+                                on_ip_request=self._fetch_ip,
+                                on_ip_copy=self._copy_text)
         self.stats.set_margin_top(6)
         root.pack_start(self.stats, False, False, 0)
 
@@ -341,6 +344,23 @@ class StatusWindow(Gtk.Window):
                                  stderr=subprocess.DEVNULL)
             except OSError:
                 pass
+
+    # ------------------------------------------------------------- IP publico
+    def _fetch_ip(self):
+        """Disparado pelo olho no card de rede. Nunca sozinho."""
+        self.stats.queue_draw()
+        pubip.fetch_async(
+            lambda ip, err: GLib.idle_add(self._ip_done, ip, err))
+
+    def _ip_done(self, ip, err):
+        self.stats.set_ip(ip, err)
+        return False
+
+    @staticmethod
+    def _copy_text(text):
+        clip = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
+        clip.set_text(text, -1)
+        clip.store()          # sobrevive ao fechamento do app
 
     # ------------------------------------------------------------- speedtest
     def _on_speedtest(self):

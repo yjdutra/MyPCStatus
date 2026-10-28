@@ -33,7 +33,11 @@ def sheet(frames, cols):
     w, h = art.WIDTH * S, art.HEIGHT * S
     out = Image.new("RGBA", (w * cols, h * rows), BG)
     for i, im in enumerate(frames):
-        out.paste(im, ((i % cols) * w, (i // cols) * h))
+        pos = ((i % cols) * w, (i // cols) * h)
+        # com a mascara: o transparente do sprite compoe sobre o fundo escuro.
+        # sem ela, o alfa do sprite SOBRESCREVE o fundo e a folha sai furada --
+        # o corpo escuro do gato sumia no tema escuro do GitHub.
+        out.paste(im, pos, im)
     return out
 
 

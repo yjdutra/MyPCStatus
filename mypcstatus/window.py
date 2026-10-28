@@ -398,4 +398,8 @@ class StatusWindow(Gtk.Window):
         self.m.stop_ping()
         self.mascot.stop()
         config.save(self.cfg)
-        Gtk.main_quit()
+        if self.app is not None:
+            self.app.quit()
+        else:
+            # as ferramentas de tools/ sobem a janela sem Gtk.Application
+            Gtk.main_quit()

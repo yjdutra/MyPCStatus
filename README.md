@@ -107,6 +107,7 @@ Opcionais, para ícone de bandeja e notificação: `gir1.2-ayatanaappindicator3-
 | Esconder na bandeja | botão `–` |
 | Pomodoro | `▶` inicia, `⏭` pula a fase, `↺` zera |
 | Testar a internet | botão `⚡` |
+| Abrir de novo | traz a janela que já existe para a frente, não abre uma segunda |
 
 A posição da janela é gravada sozinha quando você solta o arraste.
 
@@ -160,6 +161,11 @@ um widget flutuante sempre-no-topo precisa.
 **O tempo do pomodoro vem de `time.monotonic()`**, não da contagem de ticks. Se
 a interface travar ou o timer da GLib atrasar, o relógio continua certo.
 
+**Instância única pelo `Gtk.Application`.** O app registra um `application_id` no
+barramento de sessão; abrir de novo manda um `activate` para quem já está
+rodando e sai. Sem isso, o autostart mais um clique no menu dariam dois gatos
+disputando o `config.json`.
+
 ### Mexer no desenho
 
 O gato é um grid de caracteres, uma letra por pixel:
@@ -186,8 +192,6 @@ atualizar as imagens.
 - **Só X11.** No Wayland o GTK 3 não deixa o aplicativo posicionar a própria
   janela, então o `x`/`y` do config é ignorado e o "sempre no topo" depende do
   compositor. Foi feito e testado no Zorin OS 18 (GNOME/X11).
-- **Sem trava de instância única.** Abrir dois ao mesmo tempo faz os dois
-  disputarem o `config.json`, e o último a fechar vence.
 - O ícone de bandeja depende de uma extensão de AppIndicator. Sem ela, o app
   funciona igual — só não aparece na bandeja.
 

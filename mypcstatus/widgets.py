@@ -177,6 +177,26 @@ class StatsPanel(Gtk.DrawingArea):
         PangoCairo.show_layout(cr, layout)
         return w
 
+    def _measure(self, cr, txt, size=10, bold=False):
+        layout = PangoCairo.create_layout(cr)
+        layout.set_font_description(
+            Pango.FontDescription("Sans %s%d" % ("Bold " if bold else "", size)))
+        layout.set_text(txt, -1)
+        return layout.get_pixel_size()[0]
+
+    def _value(self, cr, x, y, w, value):
+        """Valor alinhado a' direita; quebra em duas linhas se nao couber.
+
+        "11.2GB/31.1GB" mede 91 px numa coluna de 68 e invadia a barra. Quando
+        o texto cabe -- "84°C", "17%" -- segue numa linha so'.
+        """
+        if "/" not in value or self._measure(cr, value, 10) <= w:
+            self._text(cr, x, y, value, "bright", 10, align="right", width=w)
+            return
+        used, _, total = value.partition("/")
+        self._text(cr, x, y - 6, used, "bright", 9, align="right", width=w)
+        self._text(cr, x, y + 6, "/" + total, "dim", 9, align="right", width=w)
+
     def _bar(self, cr, x, y, w, pct, color, h=BAR_H):
         rgb(cr, "track")
         rounded(cr, x, y - h / 2, w, h, h / 2)
@@ -192,8 +212,7 @@ class StatsPanel(Gtk.DrawingArea):
         bx = PAD + LABEL_W
         bw = w - PAD * 2 - LABEL_W - VALUE_W
         self._bar(cr, bx, y, bw, pct, color)
-        self._text(cr, bx + bw + 6, y, value, "bright", 10,
-                   align="right", width=VALUE_W - 6)
+        self._value(cr, bx + bw + 6, y, VALUE_W - 6, value)
 
     def _chevron(self, cr, x, y, is_open):
         """Triangulinho desenhado a mao: nao depende de glifo da fonte."""

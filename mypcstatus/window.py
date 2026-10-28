@@ -36,6 +36,7 @@ class StatusWindow(Gtk.Window):
         self.pomo = Pomodoro(cfg, on_phase_end=self._on_phase_end)
         self._speed_running = False
         self._save_pos_id = None
+        self._user_moved = False
 
         self._setup_window()
         self._build_ui()
@@ -102,14 +103,21 @@ class StatusWindow(Gtk.Window):
         return False
 
     def _on_configure(self, widget, event):
-        # debounce: so' grava a posicao quando a janela para de se mexer
-        if self._save_pos_id:
+        # So' grava a posicao quando foi o usuario que arrastou. O gerenciador
+        # de janelas tambem reposiciona por conta propria -- ao redimensionar,
+        # ao dar present(), ao mexer no arranjo de monitores -- e gravar isso
+        # fazia a janela migrar sozinha de um monitor para o outro entre uma
+        # execucao e a seguinte.
+        if not self._user_moved:
+            return False
+        if self._save_pos_id:                 # debounce: espera parar de mexer
             GLib.source_remove(self._save_pos_id)
         self._save_pos_id = GLib.timeout_add(600, self._save_pos)
         return False
 
     def _save_pos(self):
         self._save_pos_id = None
+        self._user_moved = False
         x, y = self.get_position()
         if (x, y) != (self.cfg["x"], self.cfg["y"]):
             self.cfg["x"], self.cfg["y"] = x, y
@@ -274,6 +282,7 @@ class StatusWindow(Gtk.Window):
     # ------------------------------------------------------------- eventos
     def _on_drag(self, widget, event):
         if event.button == 1:
+            self._user_moved = True           # a partir daqui vale gravar
             self.begin_move_drag(event.button, int(event.x_root),
                                  int(event.y_root), event.time)
             return True
@@ -394,7 +403,8 @@ class StatusWindow(Gtk.Window):
                                       else "Iniciar pomodoro")
 
     def quit(self):
-        self._save_pos()
+        if self._user_moved:                  # arraste que o debounce nao pegou
+            self._save_pos()
         self.m.stop_ping()
         self.mascot.stop()
         config.save(self.cfg)
